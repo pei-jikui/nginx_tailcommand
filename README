@@ -1,3 +1,41 @@
+功能：
+此功能可以在执行完某一类配置指令后执行特定脚本或者可执行程序，用来完成和系统的联动。
 
-Documentation is available at http://nginx.org
+通过此功能可以不用修改源码直接通过配置来完成特定功能。
+
+用法：
+配置语法：
+tail_command <nginx directive> <executable program>
+
+比如：
+
+tail_command proxy_bind /root/nginx/proxy_bind
+
+tail_command listen listen_script.sh
+
+配置语义：
+tail_command listen ./listen_scritpt.sh
+
+意思是，在执行完每条listen指令后顺便执行listen_script.sh脚本。并且把listen指令对应的参数都传递给listen_script脚本。
+
+比如指令listen 80;执行完毕后，执行的脚本是./listen_script listen 80
+
+指令listen 1.2.3.4 80-90; 执行完毕后， 执行的脚本是 ./listen_script listen 1.2.3.4 80-90
+
+脚本或者可执行文件的名称可以是绝对路径，如果是相对路径则在NGINX的安装目录中查找，并且要求脚本或者可执行文件的属性是可执行。如果找不到配置的脚本或可执行文件，或者属性不可执行，则配置出错。
+
+同一种指令只能配置一次，比如如下配置对listen指令进行了重复配置，属于配置错误：
+
+tail_command listen ./listen_scritp.sh
+
+tail_command listen ./listen_executable 
+
+限制：
+1. tail_command支持的指令只能是block里的指令，不支持main configure. 
+
+2. tail_command配置指令要求放到配置文件开头处。
+
+3. 只能支持某一类指令，而不是某一条指令。
+
+4. 指令中的变量还不能求值后再传递。 比如 listen &host 80; 传递给脚本或者可执行程序的参数是 $host 80。
 
