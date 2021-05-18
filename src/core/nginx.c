@@ -26,6 +26,7 @@ static char *ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd,
 static char *ngx_set_worker_processes(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_load_module(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+static char *ngx_set_tail_command(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 #if (NGX_HAVE_DLOPEN)
 static void ngx_unload_module(void *data);
 #endif
@@ -78,6 +79,13 @@ static ngx_command_t  ngx_core_commands[] = {
     { ngx_string("worker_processes"),
       NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,
       ngx_set_worker_processes,
+      0,
+      0,
+      NULL },
+
+    { ngx_string("tail_command"),
+      NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE2,
+      ngx_set_tail_command,
       0,
       0,
       NULL },
@@ -637,6 +645,30 @@ ngx_cleanup_environment(void *data)
 }
 
 
+u_char *ngx_find_tail_command(ngx_conf_t *cf, const char *directive)
+{
+
+    ngx_core_conf_t  *ccf = NULL;
+    ngx_tail_command_t   *tail_commands = NULL;
+    ngx_tail_command_t   *item = NULL;
+    ngx_int_t i = 0, count = 0;
+
+    if (cf == NULL || directive == NULL) {
+        return NULL;
+    }
+
+    ccf = (ngx_core_conf_t *) ngx_get_conf(cf->cycle->conf_ctx, ngx_core_module);
+    tail_commands = (ngx_tail_command_t *)ccf->tail_commands.elts;
+    count = ccf->tail_commands.nelts;
+
+    for (i = 0; i < count; i ++) {
+        item = tail_commands + i;
+        if (ngx_strncmp(item->directive.data, directive, ngx_strlen(directive)) == 0) {
+            return item->script.data;
+        }
+    }
+    return NULL;
+}
 ngx_pid_t
 ngx_exec_new_binary(ngx_cycle_t *cycle, char *const *argv)
 {
@@ -1045,6 +1077,11 @@ ngx_core_module_create_conf(ngx_cycle_t *cycle)
         return NULL;
     }
 
+    if (ngx_array_init(&ccf->tail_commands, cycle->pool, 10, sizeof(ngx_tail_command_t))
+        != NGX_OK) {
+        ngx_array_destroy(&ccf->env);
+        return NULL;
+    }
     return ccf;
 }
 
@@ -1462,6 +1499,57 @@ ngx_get_cpu_affinity(ngx_uint_t n)
 #endif
 }
 
+static char *
+ngx_set_tail_command(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_str_t               *value;
+    ngx_core_conf_t         *ccf;
+    ngx_tail_command_t  *item = NULL;
+    ngx_str_t                directive, script;
+    ngx_int_t                count = 0, i = 0;
+    ngx_tail_command_t   *tail_commands = NULL;
+    ngx_file_info_t          fi;
+
+    count = cf->args->nelts;
+    if ( count != 3) {
+        return NGX_CONF_ERROR;
+    }
+
+    value = cf->args->elts;
+    directive = value[1];
+    script = value[2];
+
+    ccf = (ngx_core_conf_t *) conf;
+    tail_commands = (ngx_tail_command_t *)ccf->tail_commands.elts;
+    count = ccf->tail_commands.nelts;
+
+    if (ngx_conf_full_name(cf->cycle, &script, 0) != NGX_OK) {
+        return NGX_CONF_ERROR;
+    }
+
+    /*check if the directive name already exists or not.*/
+    for (i=0; i < count; i ++){
+        item = tail_commands + i;
+        if (ngx_strncmp(item->directive.data, directive.data, directive.len) == 0) {
+            return "duplicated directive scripts found.";
+        }
+    }
+
+    /*check if the script exists and executable.*/
+    if (ngx_file_info(script.data, &fi) == NGX_FILE_ERROR) {
+        return "open script file error";
+    }
+
+    if (!ngx_is_exec(&fi)) {
+        return "script file isn't executable";
+    }
+
+    /*insert a new item*/
+    item = (ngx_tail_command_t *)ngx_array_push(&ccf->tail_commands);
+    item->script = script;
+    item->directive = directive;
+    return NGX_CONF_OK;
+}
 
 static char *
 ngx_set_worker_processes(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)

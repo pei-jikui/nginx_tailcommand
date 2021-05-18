@@ -117,6 +117,7 @@ typedef struct {
     char                    **environment;
 
     ngx_uint_t                transparent;  /* unsigned  transparent:1; */
+    ngx_array_t               tail_commands;
 } ngx_core_conf_t;
 
 
@@ -134,7 +135,7 @@ ngx_cpuset_t *ngx_get_cpu_affinity(ngx_uint_t n);
 ngx_shm_zone_t *ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name,
     size_t size, void *tag);
 void ngx_set_shutdown_timer(ngx_cycle_t *cycle);
-
+u_char *ngx_find_tail_command(ngx_conf_t *cf, const char *directive);
 
 extern volatile ngx_cycle_t  *ngx_cycle;
 extern ngx_array_t            ngx_old_cycles;

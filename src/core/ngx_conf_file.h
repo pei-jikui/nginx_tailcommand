@@ -108,6 +108,10 @@ typedef struct {
     ngx_buf_t            *buffer;
 } ngx_conf_dump_t;
 
+typedef struct {
+    ngx_str_t    directive;
+    ngx_str_t    script;
+} ngx_tail_command_t;
 
 typedef char *(*ngx_conf_handler_pt)(ngx_conf_t *cf,
     ngx_command_t *dummy, void *conf);
@@ -290,6 +294,5 @@ char *ngx_conf_set_sec_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 char *ngx_conf_set_bufs_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 char *ngx_conf_set_enum_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 char *ngx_conf_set_bitmask_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
-
 
 #endif /* _NGX_CONF_FILE_H_INCLUDED_ */

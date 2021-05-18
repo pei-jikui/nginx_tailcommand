@@ -8,6 +8,7 @@
 *.ll
 *.ll-*
 
+build_cc.sh
 # Folders
 _obj
 _test

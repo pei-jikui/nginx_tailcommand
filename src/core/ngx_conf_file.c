@@ -357,12 +357,17 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
 {
     char           *rv;
     void           *conf, **confp;
-    ngx_uint_t      i, found;
+    ngx_uint_t      i, found, n;
     ngx_str_t      *name;
     ngx_command_t  *cmd;
+    char * script = NULL;
+    char **  process_env;
+    char **process_param;
+    ngx_str_t *parameter = NULL;
+    ngx_exec_ctx_t     ctx;
+    ngx_pid_t          pid;
 
     name = cf->args->elts;
-
     found = 0;
 
     for (i = 0; cf->cycle->modules[i]; i++) {
@@ -460,8 +465,34 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
                 }
             }
 
-            rv = cmd->set(cf, cmd, conf);
+            if (!ngx_test_config && ngx_process != NGX_PROCESS_SIGNALLER) {
+                if ( !(cmd->type & NGX_MAIN_CONF)) {
+                    script =  (char *)ngx_find_tail_command(cf, (const char *)cmd->name.data);
+                    if (script != NULL) {
+                        n = 2;
+                        process_env = ngx_set_environment(cf->cycle, &n);
+                        parameter = (ngx_str_t *)cf->args->elts;
+                        process_param = ngx_pcalloc(cf->pool, (cf->args->nelts + 2) * sizeof(const char *));
+                        process_param[0] = (char *)cmd->name.data;
+                        for (i=0; i < cf->args->nelts; i ++) {
+                            process_param[i+1] = (char *)parameter->data;
+                            parameter ++;
+                        }
+                        ctx.path = script;
+                        ctx.name = "Tail Command";
+                        ctx.argv = process_param;
+                        ctx.envp = process_env;
+                        pid = ngx_execute(cf->cycle, &ctx);
+                        if (pid == NGX_INVALID_PID) {
+                            printf("script execut error.\n");
+                        }
+                        ngx_free(process_env);
+                        ngx_pfree(cf->pool, process_param);
+                    }
+                }
+            }
 
+            rv = cmd->set(cf, cmd, conf);
             if (rv == NGX_CONF_OK) {
                 return NGX_OK;
             }
